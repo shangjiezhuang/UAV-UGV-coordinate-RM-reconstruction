@@ -16,6 +16,7 @@ logs/
 eval_results/
 backup/
 outputs/
+BNN_2/
 
 **/checkpoints/
 *.pt
