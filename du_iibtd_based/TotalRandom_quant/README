@@ -1,0 +1,15 @@
+这个代码中采用了 UAV-UGV 全部随机策略选择动作，并加入了量化采样。
+
+UAV 动作空间为：
+
+direction × bandwidth_ratio × quant_bits
+
+默认量化 bit 深度选择为 `[10, 8, 6]`，默认初始 bit 深度为 `10`。采样流程为：当前网格真值加噪后，在 log 域按所选 bit 深度量化，再反量化为连续值送入后续传输队列和 II-BTD 重构。
+
+入口脚本直接评估随机策略，不包含学习过程，默认运行 10 个 episode 后输出均值/标准差指标。
+
+运行示例：
+
+```bash
+python train.py --eval_episodes 10
+```

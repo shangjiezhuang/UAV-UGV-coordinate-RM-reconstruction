@@ -1,0 +1,604 @@
+"""
+Configuration for the total-random UAV-UGV quantized-sampling baseline.
+
+All hyperparameters and environment settings are centralized here.
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Tuple
+import os
+import sys
+import numpy as np
+
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from du_iibtd_based.du_iibtd_learn_nu import (
+    DEFAULT_DU_IIBTD_RES_SR_CHECKPOINTS,
+    DEFAULT_DU_IIBTD_RES_SR_LEARN_NU_CHECKPOINTS,
+)
+
+
+@dataclass
+class SceneConfig:
+    """City scene and grid configuration."""
+    grid_size: Tuple[int, int] = (64, 64)       # Placeholder only; overwritten from loaded RadioSeer sample shape
+    grid_spacing: float = 2                    # Meters per cell used by motion, distance, and SNR calculations
+    uav_height: float = 30.0                      # Fixed UAV flight altitude (m)
+    ugv_height: float = 0.0                       # UGV antenna height above ground (m)
+    building_height_m: float = 25.0              # Default building height used for 3D LOS blocking (m)
+    scene_source: str = "radioseerselect"        # Loader family tag for manifest-compatible RadioSeer datasets
+    radioseer_root: str = "RadioSeerDPM100PSD"   # Dataset folder relative to repo root or absolute path
+    radioseer_sample_index: int = 8513           # Selected manifest row in the configured RadioSeer dataset
+    radioseer_scene_indices: List[int] = field(default_factory=lambda: [8513, 1807, 1651, 1371, 10001])
+
+    # Frequency configuration
+    total_freq_bands_nums: int = 30                     # Total number of frequency bands (K)
+    freq_start: float = 3.5e9                      # Start frequency (Hz)
+    freq_end: float = 3.7e9                        # End frequency (Hz)
+
+    @property
+    def freq_bands(self) -> np.ndarray:
+        return np.linspace(self.freq_start, self.freq_end, self.total_freq_bands_nums)
+
+    @property
+    def scene_width(self) -> float:
+        return self.grid_size[0] * self.grid_spacing
+
+    @property
+    def scene_height(self) -> float:
+        return self.grid_size[1] * self.grid_spacing
+
+
+@dataclass
+class UAVConfig:
+    """UAV agent configuration."""
+    # Movement
+    num_directions: int = 5                        # 4 cardinal directions + stay
+    step_size: float = 4.0                        # Movement distance per action in grid cells
+
+    # Energy
+    max_energy: float = 60_000                     # Maximum energy budget (Joules)
+    flight_power: float = 12.0                     # Power consumption during flight (W)
+    hover_power: float = 8.0                      # Power consumption during hover (W)
+    sensing_power: float = 5.0                     # Power for spectrum sensing (W)
+    step_duration: float = 1.0                     # Duration per grid hop / hover step (seconds)
+
+    # Bandwidth
+    total_bandwidth: float = 100e6               # Total RF bandwidth (Hz)
+    total_bw_num: int = 12                        # Total discrete bandwidth units
+    default_bw_ratio: float = 0.6                 # Default sensing bandwidth ratio
+    queue_capacity_packets: int = 8               # Max pending sample packets buffered on the UAV
+
+    bandwidth_ratios: List[float] = field(
+        default_factory=lambda: [0.2, 0.3, 0.5, 0.6]  # Discrete sensing bandwidth ratios
+    )
+    quant_bits: List[int] = field(
+        default_factory=lambda: [10, 8, 6]         # Discrete log-domain quantization bits
+    )
+    default_quant_bits: int = 10                   # Initial UAV quantization bit depth
+
+    @property
+    def num_bandwidth_ratios(self) -> int:
+        return len(self.bandwidth_ratios)
+
+    @property
+    def num_quant_bits(self) -> int:
+        return len(self.quant_bits)
+
+    @property
+    def unit_bandwidth_hz(self) -> float:
+        return self.total_bandwidth / max(1, self.total_bw_num)
+
+
+@dataclass
+class UGVConfig:
+    """UGV agent configuration."""
+    num_directions: int = 5                        # 4 cardinal directions + stay
+    step_size: float = 5.0                        # Movement distance per step in grid cells
+
+
+@dataclass
+class CommConfig:
+    """Communication channel configuration."""
+    carrier_freq: float = 3.5e9                    # Communication carrier frequency (Hz)
+    tx_power_dbm: float = 1.0                      # UAV transmit power (dBm)
+    noise_figure_db: float = 8.0                   # Receiver noise figure (dB)
+    data_per_sample: float = 8e6                   # Data size per frequency band sample (bits)
+    shadow_std_los_db: float = 2.0                 # Log-normal shadow std when LoS (dB)
+    shadow_std_nlos_db: float = 6.0                # Log-normal shadow std when NLoS (dB)
+    nlos_excess_db: float = 15.0                   # Extra NLoS attenuation (dB)
+
+
+@dataclass
+class RewardConfig:
+    """Reward function coefficients."""
+    alpha_nmse: float = 20.0                       # Weight for normalized NMSE-improvement reward (delta_nmse_norm)
+    nmse_signed_clip: float = 0.25                # Clip signed normalized NMSE delta before scaling; <=0 disables clipping
+    target_gap_penalty_coef: float = 1.0          # Diagnostic-only target-gap penalty coefficient; not added to team reward
+    alpha_unc: float = 0.0                         # Weight for normalized uncertainty-reduction reward (delta_unc_norm)
+    lambda_new_freq: float = 0.03                  # Reward per newly sampled frequency band; default low for NMSE-focused runs
+    lambda_new_spatial: float = 0.5               # Reward for visiting a previously unsampled grid cell
+    beta_tx: float = 0.0                          # Retained for compatibility; tx reward is disabled in local-goal shaping
+    gamma_queue: float = 1.5                      # Weight for queue-bits penalty
+    lambda_uav_progress: float = 3              # Reward for UAV moving closer to active local target
+    lambda_uav_backtrack: float = 6             # Penalty for UAV moving away from active target
+    lambda_ugv_progress: float = 3              # Reward for UGV moving closer to UAV
+    lambda_ugv_backtrack: float = 6             # Penalty for UGV moving away from UAV
+    ugv_progress_uav_weight: float = 0.4        # Relative weight of UGV->UAV grid-distance progress
+    ugv_progress_target_weight: float = 0.6     # Relative weight of UGV->target shortest-path progress
+    bootstrap_progress_scale: float = 1.0        # Keep bootstrap targets reward-aligned with the observation target encoding
+    lambda_spatial_revisit: float = 0.8          # Penalty for repeated sensing at the same grid cell with low novelty
+    local_goal_arrival_bonus: float = 1.2        # Bonus when the UAV reaches the planner-selected local goal
+    q_ref: float = 8.0                             # Reference queue length for normalization
+    accuracy_target_nmse: float = 0.08             # Target NMSE tracked for diagnostics; does not end episodes
+    terminal_failure_penalty: float = 20.0        # Penalty only when UAV energy is exhausted before the horizon
+
+
+@dataclass
+class PlannerConfig:
+    """UGV-side active-planner configuration."""
+    target_count: int = 1                          # Number of planner targets exposed each cycle
+    obs_target_slots: int = 1                      # Number of target slots encoded into UAV observation
+    target_mode: str = "hybrid"                     # Planner target scope: local | global | hybrid
+    initial_observation_mode: str = "prefill"    # Warmup mode before planner: bootstrap | prefill
+    local_planner_radius: int = 30                  # Planner only searches targets within this Manhattan radius of the UAV
+    hybrid_nmse_stall_steps: int = 2               # In hybrid mode, switch local->global after this many low-improvement map updates
+    hybrid_nmse_stall_threshold: float = 0.02      # Treat planner NMSE improvement below this threshold as stalled
+    hybrid_global_hold_intervals: int = 9          # In hybrid mode, hold global submode for this many ensemble intervals
+    hybrid_local_reentry_min_targets: int = 2      # Effective local reentry threshold is max(this value, target_count)
+    prefill_percent: float = 6                   # Prefill observations as a percentage of the sensing-budget basis
+    prefill_budget_basis: int = 0                  # Prefill budget basis; <=0 falls back to episode_max_steps
+    init_pair_max_distance: float = 7.0            # Max initial UAV-UGV separation in grid units
+    init_building_clearance: int = 5               # Prefer initial UAV/UGV cells with this many grid cells of building clearance
+    bootstrap_building_clearance: int = 5          # Prefer bootstrap targets with this many grid cells of building clearance
+    flush_reconstruction_on_episode_end: bool = False  # Force one last expensive reconstruction at terminal steps
+
+    ensemble_refresh_interval: int = 3            # Refresh ensemble mean/variance and planner targets after this many newly delivered samples
+
+    min_samples_for_ensemble: int = 12            # Start planner/ensemble after enough UGV-side effective samples
+
+    # Shared-member ensemble
+    ensemble_size: int = 3
+    ensemble_kernel_bandwidth_mode: str = "base_pm_delta"
+    ensemble_kernel_bandwidth_delta: float = 0.17
+    ensemble_init_jitter_scale: float = 1e-2
+    ensemble_quality_weighted: bool = True         # Weight ensemble members by observed-entry NMSE
+    ensemble_full_refresh_interval: int = 0        # Periodic full shared-member ensemble refit; <=0 disables periodic refresh
+    nmse_refresh_delta: float = 0.1                # Trigger a full ensemble refit when incremental NMSE degrades by this much; <=0 disables it
+    incremental_outer_iters: int = 2               # Outer iterations for fit_incremental between full refreshes
+    incremental_max_svt_iters: int = 20            # Max SVT iterations for incremental solver updates
+
+    # Acquisition weights
+    lambda_u: float = 1.0
+    beta_f: float = 0.3
+    redundancy_length: float = 20.0             # Visualization-only spacing for displayed global top-k markers
+
+    # II-BTD reconstruction backend
+    iibtd_mu: float = 1e-1                        # II-BTD solver penalty parameter mu
+    iibtd_nu: float = 1e-1                        # II-BTD solver penalty parameter nu
+    iibtd_kernel_bandwidth: float = 0.6          # II-BTD kernel bandwidth
+    iibtd_backend: str = "auto"                   # auto | cpu | gpu | du_iibtd_res_sr | du_iibtd_res_sr_learn_nu
+    iibtd_device: str = "cuda:0"                 # auto | cuda | cuda:0 | cpu; runtime prefers cuda:2 when available
+    iibtd_gpu_phi_solver: str = "pgd"           # scipy | pgd
+    du_iibtd_checkpoints: List[str] = field(default_factory=list)  # Used when iibtd_backend is du_iibtd_res_sr or du_iibtd_res_sr_learn_nu
+
+
+@dataclass
+class RunConfig:
+    """Runtime settings for direct random-policy evaluation."""
+    episode_max_steps: int = 200                   # Maximum steps per episode
+    seed: int = 42
+    device: str = "cuda:0"                        # Fallback runtime device for II-BTD when needed
+    eval_episodes: int = 10                         # Number of evaluation episodes
+    log_dir: str = "logs"
+
+
+@dataclass
+class Config:
+    """Master configuration combining all sub-configs."""
+    scene: SceneConfig = field(default_factory=SceneConfig)
+    uav: UAVConfig = field(default_factory=UAVConfig)
+    ugv: UGVConfig = field(default_factory=UGVConfig)
+    comm: CommConfig = field(default_factory=CommConfig)
+    reward: RewardConfig = field(default_factory=RewardConfig)
+    planner: PlannerConfig = field(default_factory=PlannerConfig)
+    run: RunConfig = field(default_factory=RunConfig)
+
+    def __post_init__(self):
+        """Validate configuration consistency."""
+        def _ensure(condition: bool, message: str) -> None:
+            if not condition:
+                raise ValueError(message)
+
+        if len(self.scene.grid_size) != 2:
+            raise ValueError(
+                f"scene.grid_size must have length 2, got {self.scene.grid_size!r}"
+            )
+        self.scene.grid_size = tuple(int(v) for v in self.scene.grid_size)
+        _ensure(
+            all(v > 0 for v in self.scene.grid_size),
+            f"scene.grid_size must contain positive integers, got {self.scene.grid_size!r}",
+        )
+
+        grid_spacing = float(self.scene.grid_spacing)
+        _ensure(grid_spacing > 0.0, f"scene.grid_spacing must be positive, got {grid_spacing}")
+        self.scene.scene_source = str(self.scene.scene_source).strip().lower() or "radioseerselect"
+        _ensure(
+            self.scene.scene_source == "radioseerselect",
+            "scene.scene_source must be radioseerselect, got "
+            f"{self.scene.scene_source!r}",
+        )
+        self.scene.radioseer_root = str(self.scene.radioseer_root).strip() or "RadioSeerDPM100PSD"
+        self.scene.radioseer_sample_index = int(self.scene.radioseer_sample_index)
+        self.scene.uav_height = float(self.scene.uav_height)
+        self.scene.ugv_height = float(self.scene.ugv_height)
+        self.scene.building_height_m = float(self.scene.building_height_m)
+        _ensure(
+            self.scene.uav_height >= 0.0,
+            f"scene.uav_height must be non-negative, got {self.scene.uav_height}",
+        )
+        _ensure(
+            self.scene.ugv_height >= 0.0,
+            f"scene.ugv_height must be non-negative, got {self.scene.ugv_height}",
+        )
+        _ensure(
+            self.scene.uav_height >= self.scene.ugv_height,
+            "scene.uav_height must be >= scene.ugv_height, got "
+            f"{self.scene.uav_height} < {self.scene.ugv_height}",
+        )
+        _ensure(
+            self.scene.building_height_m >= 0.0,
+            "scene.building_height_m must be non-negative, got "
+            f"{self.scene.building_height_m}",
+        )
+        self.scene.total_freq_bands_nums = int(self.scene.total_freq_bands_nums)
+        _ensure(
+            self.scene.total_freq_bands_nums > 0,
+            "scene.total_freq_bands_nums must be positive, got "
+            f"{self.scene.total_freq_bands_nums}",
+        )
+        _ensure(
+            float(self.scene.freq_end) > float(self.scene.freq_start),
+            "scene.freq_end must be greater than scene.freq_start, got "
+            f"{self.scene.freq_start} -> {self.scene.freq_end}",
+        )
+
+        self.uav.total_bw_num = int(self.uav.total_bw_num)
+        _ensure(
+            self.uav.total_bw_num > 1,
+            f"uav.total_bw_num must be greater than 1, got {self.uav.total_bw_num}",
+        )
+        self.uav.queue_capacity_packets = int(self.uav.queue_capacity_packets)
+        _ensure(
+            self.uav.queue_capacity_packets > 0,
+            "uav.queue_capacity_packets must be positive, got "
+            f"{self.uav.queue_capacity_packets}",
+        )
+        _ensure(
+            float(self.uav.total_bandwidth) > 0.0,
+            f"uav.total_bandwidth must be positive, got {self.uav.total_bandwidth}",
+        )
+        self.uav.default_bw_ratio = float(self.uav.default_bw_ratio)
+        _ensure(
+            0.0 < self.uav.default_bw_ratio < 1.0,
+            "uav.default_bw_ratio must be in (0, 1), got "
+            f"{self.uav.default_bw_ratio}",
+        )
+        self.uav.bandwidth_ratios = [float(ratio) for ratio in self.uav.bandwidth_ratios]
+        _ensure(len(self.uav.bandwidth_ratios) > 0, "uav.bandwidth_ratios must not be empty")
+        invalid_bw_ratios = [
+            ratio for ratio in self.uav.bandwidth_ratios if not (0.0 < ratio < 1.0)
+        ]
+        _ensure(
+            not invalid_bw_ratios,
+            "uav.bandwidth_ratios must all be in (0, 1), got "
+            f"{invalid_bw_ratios}",
+        )
+        self.uav.quant_bits = [int(bits) for bits in self.uav.quant_bits]
+        _ensure(len(self.uav.quant_bits) > 0, "uav.quant_bits must not be empty")
+        invalid_quant_bits = [bits for bits in self.uav.quant_bits if bits <= 0]
+        _ensure(
+            not invalid_quant_bits,
+            "uav.quant_bits must all be positive integers, got "
+            f"{invalid_quant_bits}",
+        )
+        _ensure(
+            len(set(self.uav.quant_bits)) == len(self.uav.quant_bits),
+            "uav.quant_bits must not contain duplicate entries, got "
+            f"{self.uav.quant_bits}",
+        )
+        self.uav.default_quant_bits = int(self.uav.default_quant_bits)
+        _ensure(
+            self.uav.default_quant_bits in self.uav.quant_bits,
+            "uav.default_quant_bits must be one of uav.quant_bits, got "
+            f"{self.uav.default_quant_bits} not in {self.uav.quant_bits}",
+        )
+
+        self.uav.num_directions = int(self.uav.num_directions)
+        self.ugv.num_directions = int(self.ugv.num_directions)
+        _ensure(
+            self.uav.num_directions > 0,
+            f"uav.num_directions must be positive, got {self.uav.num_directions}",
+        )
+        _ensure(
+            self.ugv.num_directions > 0,
+            f"ugv.num_directions must be positive, got {self.ugv.num_directions}",
+        )
+
+        self.uav.step_size = float(self.uav.step_size)
+        self.ugv.step_size = float(self.ugv.step_size)
+        _ensure(self.uav.step_size > 0.0, f"uav.step_size must be positive, got {self.uav.step_size}")
+        _ensure(self.ugv.step_size > 0.0, f"ugv.step_size must be positive, got {self.ugv.step_size}")
+        _ensure(
+            np.isclose(self.uav.step_size, round(self.uav.step_size)),
+            "uav.step_size must be an integer number of grid cells, got "
+            f"{self.uav.step_size}",
+        )
+        _ensure(
+            np.isclose(self.ugv.step_size, round(self.ugv.step_size)),
+            "ugv.step_size must be an integer number of grid cells, got "
+            f"{self.ugv.step_size}",
+        )
+
+        self.reward.q_ref = float(self.reward.q_ref)
+        _ensure(
+            self.reward.q_ref > 0.0,
+            f"reward.q_ref must be positive, got {self.reward.q_ref}",
+        )
+        self.reward.ugv_progress_uav_weight = float(self.reward.ugv_progress_uav_weight)
+        self.reward.ugv_progress_target_weight = float(self.reward.ugv_progress_target_weight)
+        _ensure(
+            self.reward.ugv_progress_uav_weight >= 0.0,
+            "reward.ugv_progress_uav_weight must be non-negative, got "
+            f"{self.reward.ugv_progress_uav_weight}",
+        )
+        _ensure(
+            self.reward.ugv_progress_target_weight >= 0.0,
+            "reward.ugv_progress_target_weight must be non-negative, got "
+            f"{self.reward.ugv_progress_target_weight}",
+        )
+        ugv_progress_weight_sum = (
+            self.reward.ugv_progress_uav_weight + self.reward.ugv_progress_target_weight
+        )
+        _ensure(
+            ugv_progress_weight_sum > 0.0,
+            "reward.ugv_progress_uav_weight + reward.ugv_progress_target_weight "
+            "must be positive",
+        )
+        self.reward.ugv_progress_uav_weight /= ugv_progress_weight_sum
+        self.reward.ugv_progress_target_weight /= ugv_progress_weight_sum
+
+        self.planner.target_count = int(self.planner.target_count)
+        self.planner.obs_target_slots = int(self.planner.obs_target_slots)
+        self.planner.target_mode = str(self.planner.target_mode).strip().lower() or "hybrid"
+        self.planner.initial_observation_mode = (
+            str(self.planner.initial_observation_mode).strip().lower() or "bootstrap"
+        )
+        self.planner.local_planner_radius = int(self.planner.local_planner_radius)
+        self.planner.hybrid_nmse_stall_steps = int(self.planner.hybrid_nmse_stall_steps)
+        self.planner.hybrid_nmse_stall_threshold = float(self.planner.hybrid_nmse_stall_threshold)
+        self.planner.hybrid_global_hold_intervals = int(self.planner.hybrid_global_hold_intervals)
+        self.planner.hybrid_local_reentry_min_targets = int(self.planner.hybrid_local_reentry_min_targets)
+        self.planner.prefill_percent = float(self.planner.prefill_percent)
+        self.planner.prefill_budget_basis = int(self.planner.prefill_budget_basis)
+        self.planner.init_building_clearance = int(self.planner.init_building_clearance)
+        self.planner.bootstrap_building_clearance = int(self.planner.bootstrap_building_clearance)
+        self.planner.flush_reconstruction_on_episode_end = bool(
+            self.planner.flush_reconstruction_on_episode_end
+        )
+        self.planner.ensemble_refresh_interval = int(self.planner.ensemble_refresh_interval)
+        self.planner.ensemble_full_refresh_interval = int(self.planner.ensemble_full_refresh_interval)
+        self.planner.nmse_refresh_delta = float(self.planner.nmse_refresh_delta)
+        self.planner.incremental_outer_iters = int(self.planner.incremental_outer_iters)
+        self.planner.incremental_max_svt_iters = int(self.planner.incremental_max_svt_iters)
+        self.planner.ensemble_kernel_bandwidth_mode = (
+            str(self.planner.ensemble_kernel_bandwidth_mode).strip().lower()
+            or "base_pm_delta"
+        )
+        self.planner.ensemble_kernel_bandwidth_delta = abs(
+            float(self.planner.ensemble_kernel_bandwidth_delta)
+        )
+        self.planner.ensemble_init_jitter_scale = max(
+            0.0,
+            float(self.planner.ensemble_init_jitter_scale),
+        )
+        self.planner.ensemble_quality_weighted = bool(self.planner.ensemble_quality_weighted)
+        _ensure(
+            self.planner.target_count > 0,
+            f"planner.target_count must be positive, got {self.planner.target_count}",
+        )
+        _ensure(
+            self.planner.obs_target_slots > 0,
+            "planner.obs_target_slots must be positive, got "
+            f"{self.planner.obs_target_slots}",
+        )
+        _ensure(
+            self.planner.obs_target_slots >= self.planner.target_count,
+            "planner.obs_target_slots must be >= planner.target_count, got "
+            f"{self.planner.obs_target_slots} < {self.planner.target_count}",
+        )
+        _ensure(
+            self.planner.target_mode in {"local", "global", "hybrid"},
+            "planner.target_mode must be one of local/global/hybrid, got "
+            f"{self.planner.target_mode!r}",
+        )
+        _ensure(
+            self.planner.initial_observation_mode in {"bootstrap", "prefill"},
+            "planner.initial_observation_mode must be one of bootstrap/prefill, got "
+            f"{self.planner.initial_observation_mode!r}",
+        )
+        _ensure(
+            self.planner.local_planner_radius > 0,
+            "planner.local_planner_radius must be positive, got "
+            f"{self.planner.local_planner_radius}",
+        )
+        _ensure(
+            self.planner.hybrid_nmse_stall_steps > 0,
+            "planner.hybrid_nmse_stall_steps must be positive, got "
+            f"{self.planner.hybrid_nmse_stall_steps}",
+        )
+        _ensure(
+            self.planner.hybrid_nmse_stall_threshold >= 0.0,
+            "planner.hybrid_nmse_stall_threshold must be >= 0, got "
+            f"{self.planner.hybrid_nmse_stall_threshold}",
+        )
+        _ensure(
+            self.planner.hybrid_global_hold_intervals > 0,
+            "planner.hybrid_global_hold_intervals must be positive, got "
+            f"{self.planner.hybrid_global_hold_intervals}",
+        )
+        _ensure(
+            self.planner.hybrid_local_reentry_min_targets >= 0,
+            "planner.hybrid_local_reentry_min_targets must be >= 0, got "
+            f"{self.planner.hybrid_local_reentry_min_targets}",
+        )
+        _ensure(
+            0.0 <= self.planner.prefill_percent <= 100.0,
+            "planner.prefill_percent must be in [0, 100], got "
+            f"{self.planner.prefill_percent}",
+        )
+        _ensure(
+            self.planner.prefill_budget_basis >= 0,
+            "planner.prefill_budget_basis must be >= 0, got "
+            f"{self.planner.prefill_budget_basis}",
+        )
+        if self.planner.initial_observation_mode == "prefill":
+            _ensure(
+                self.planner.prefill_percent > 0.0,
+                "planner.prefill_percent must be > 0 when planner.initial_observation_mode='prefill'",
+            )
+        _ensure(
+            self.planner.init_building_clearance >= 0,
+            "planner.init_building_clearance must be non-negative, got "
+            f"{self.planner.init_building_clearance}",
+        )
+        _ensure(
+            self.planner.bootstrap_building_clearance >= 0,
+            "planner.bootstrap_building_clearance must be non-negative, got "
+            f"{self.planner.bootstrap_building_clearance}",
+        )
+        if self.planner.ensemble_refresh_interval <= 0:
+            raise ValueError(
+                "planner.ensemble_refresh_interval must be positive, got "
+                f"{self.planner.ensemble_refresh_interval}"
+            )
+        _ensure(
+            self.planner.ensemble_full_refresh_interval >= 0,
+            "planner.ensemble_full_refresh_interval must be >= 0, got "
+            f"{self.planner.ensemble_full_refresh_interval}",
+        )
+        _ensure(
+            self.planner.nmse_refresh_delta >= 0.0,
+            "planner.nmse_refresh_delta must be >= 0, got "
+            f"{self.planner.nmse_refresh_delta}",
+        )
+        _ensure(
+            self.planner.incremental_outer_iters > 0,
+            "planner.incremental_outer_iters must be positive, got "
+            f"{self.planner.incremental_outer_iters}",
+        )
+        _ensure(
+            self.planner.incremental_max_svt_iters > 0,
+            "planner.incremental_max_svt_iters must be positive, got "
+            f"{self.planner.incremental_max_svt_iters}",
+        )
+        _ensure(
+            self.planner.ensemble_kernel_bandwidth_mode in {
+                "fixed",
+                "same",
+                "base_pm_delta",
+                "pm_delta",
+                "plus_minus",
+            },
+            "planner.ensemble_kernel_bandwidth_mode must be one of "
+            "fixed/same/base_pm_delta/pm_delta/plus_minus, got "
+            f"{self.planner.ensemble_kernel_bandwidth_mode!r}",
+        )
+        _ensure(
+            self.planner.ensemble_kernel_bandwidth_delta >= 0.0,
+            "planner.ensemble_kernel_bandwidth_delta must be >= 0, got "
+            f"{self.planner.ensemble_kernel_bandwidth_delta}",
+        )
+        _ensure(
+            self.planner.ensemble_init_jitter_scale >= 0.0,
+            "planner.ensemble_init_jitter_scale must be >= 0, got "
+            f"{self.planner.ensemble_init_jitter_scale}",
+        )
+        self.planner.redundancy_length = float(self.planner.redundancy_length)
+        _ensure(
+            self.planner.redundancy_length >= 0.0,
+            "planner.redundancy_length must be >= 0, got "
+            f"{self.planner.redundancy_length}",
+        )
+
+        self.planner.iibtd_mu = float(self.planner.iibtd_mu)
+        _ensure(
+            self.planner.iibtd_mu > 0.0,
+            f"planner.iibtd_mu must be positive, got {self.planner.iibtd_mu}",
+        )
+        self.planner.iibtd_nu = float(self.planner.iibtd_nu)
+        _ensure(
+            self.planner.iibtd_nu > 0.0,
+            f"planner.iibtd_nu must be positive, got {self.planner.iibtd_nu}",
+        )
+        self.planner.iibtd_kernel_bandwidth = float(self.planner.iibtd_kernel_bandwidth)
+        _ensure(
+            self.planner.iibtd_kernel_bandwidth > 0.0,
+            "planner.iibtd_kernel_bandwidth must be positive, got "
+            f"{self.planner.iibtd_kernel_bandwidth}",
+        )
+
+        self.planner.iibtd_backend = str(self.planner.iibtd_backend).strip().lower() or "auto"
+        if self.planner.iibtd_backend not in {"auto", "cpu", "gpu", "du_iibtd_res_sr", "du_iibtd_res_sr_learn_nu"}:
+            raise ValueError(
+                "planner.iibtd_backend must be one of auto/cpu/gpu/du_iibtd_res_sr/du_iibtd_res_sr_learn_nu, got "
+                f"{self.planner.iibtd_backend!r}"
+            )
+
+        self.planner.iibtd_device = str(self.planner.iibtd_device).strip() or "auto"
+
+        checkpoint_paths = [
+            str(path).strip()
+            for path in list(self.planner.du_iibtd_checkpoints or [])
+            if str(path).strip()
+        ]
+        backend = self.planner.iibtd_backend
+        if backend == "du_iibtd_res_sr":
+            if (
+                not checkpoint_paths
+                or checkpoint_paths == list(DEFAULT_DU_IIBTD_RES_SR_LEARN_NU_CHECKPOINTS)
+            ):
+                checkpoint_paths = list(DEFAULT_DU_IIBTD_RES_SR_CHECKPOINTS)
+        elif backend == "du_iibtd_res_sr_learn_nu":
+            if (
+                not checkpoint_paths
+                or checkpoint_paths == list(DEFAULT_DU_IIBTD_RES_SR_CHECKPOINTS)
+            ):
+                checkpoint_paths = list(DEFAULT_DU_IIBTD_RES_SR_LEARN_NU_CHECKPOINTS)
+        self.planner.du_iibtd_checkpoints = checkpoint_paths
+
+        self.planner.iibtd_gpu_phi_solver = (
+            str(self.planner.iibtd_gpu_phi_solver).strip().lower() or "scipy"
+        )
+        if self.planner.iibtd_gpu_phi_solver not in {"scipy", "pgd"}:
+            raise ValueError(
+                "planner.iibtd_gpu_phi_solver must be one of scipy/pgd, got "
+                f"{self.planner.iibtd_gpu_phi_solver!r}"
+            )
+
+        self.run.episode_max_steps = int(self.run.episode_max_steps)
+        self.run.seed = int(self.run.seed)
+        self.run.device = str(self.run.device).strip() or "cpu"
+        self.run.eval_episodes = int(self.run.eval_episodes)
+        self.run.log_dir = str(self.run.log_dir).strip() or "logs"
+
+        _ensure(
+            self.run.episode_max_steps > 0,
+            f"run.episode_max_steps must be positive, got {self.run.episode_max_steps}",
+        )
+        _ensure(
+            self.run.eval_episodes > 0,
+            f"run.eval_episodes must be positive, got {self.run.eval_episodes}",
+        )

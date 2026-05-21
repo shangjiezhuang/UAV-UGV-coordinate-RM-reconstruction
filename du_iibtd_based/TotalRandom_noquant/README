@@ -1,0 +1,13 @@
+这个代码中，UAV-UGV 全部采用随机策略选择动作，无量化采样。
+
+- UAV：从 action_mask 允许的 joint action 中均匀随机选择，即合法的“移动方向 × 带宽比例”组合。
+- UGV：从 action_mask 允许的 5 个动作中均匀随机选择：停留 / 东 / 南 / 西 / 北。
+- planner、IIBTD ensemble、queue、链路、建筑约束、map update 机制保留。
+- 不包含 actor/critic、PPO、buffer、optimizer、checkpoint 等学习相关模块。
+- 入口脚本直接评估随机策略，默认运行 10 个 episode 后输出均值/标准差指标。
+
+运行示例：
+
+```bash
+python train.py --eval_episodes 10
+```

@@ -1,6 +1,6 @@
 import numpy as np
+from scipy.optimize._nnls import nnls
 import torch
-from scipy.optimize import nnls
 
 
 class II_BTD_Opt_GPU:
@@ -31,7 +31,7 @@ class II_BTD_Opt_GPU:
         kernel_bandwidth=1,
         warmstart=False,
         device=None,
-        dtype=torch.float64,
+        dtype=torch.float32,
         phi_solver="scipy",
         pgd_max_iter=250,
         pgd_tol=1e-10,
@@ -78,6 +78,8 @@ class II_BTD_Opt_GPU:
         self._Weights_raw_t = None
         self._I_mask_bool_t = None
         self._I_mask_t = None
+        self._obs_size = 0
+        self._obs_capacity = 0
 
         self._sensor_locs = None
         self._Gamma = None
@@ -114,20 +116,25 @@ class II_BTD_Opt_GPU:
             return arr.detach().cpu().numpy()
         return np.asarray(arr)
 
-    def _sync_public_state(self):
-        self.Theta = None if self._Theta_t is None else self._to_numpy(self._Theta_t)
-        self.Phi = None if self._Phi_t is None else self._to_numpy(self._Phi_t)
-        self.Sr = None if self._Sr_t is None else self._to_numpy(self._Sr_t)
-        self.H_hat = None if self._H_hat_t is None else self._to_numpy(self._H_hat_t)
+    def _sync_public_state(self, names=None):
+        if names is None:
+            names = ("Theta", "Phi", "Sr", "H_hat")
+        names = set(names)
+
+        self.Theta = None if "Theta" not in names or self._Theta_t is None else self._to_numpy(self._Theta_t)
+        self.Phi = None if "Phi" not in names or self._Phi_t is None else self._to_numpy(self._Phi_t)
+        self.Sr = None if "Sr" not in names or self._Sr_t is None else self._to_numpy(self._Sr_t)
+        self.H_hat = None if "H_hat" not in names or self._H_hat_t is None else self._to_numpy(self._H_hat_t)
 
     def _sync_public_cache(self):
-        self._sensor_locs = None if self._sensor_locs_t is None else self._to_numpy(self._sensor_locs_t)
-        self._Gamma = None if self._Gamma_t is None else self._to_numpy(self._Gamma_t)
-        self._Omega = None if self._Omega_t is None else self._to_numpy(self._Omega_t)
+        obs_size = int(self._obs_size)
+        self._sensor_locs = None if self._sensor_locs_t is None else self._to_numpy(self._sensor_locs_t[:obs_size])
+        self._Gamma = None if self._Gamma_t is None else self._to_numpy(self._Gamma_t[:obs_size])
+        self._Omega = None if self._Omega_t is None else self._to_numpy(self._Omega_t[:obs_size])
         self._grid_coords = None if self._grid_coords_t is None else self._to_numpy(self._grid_coords_t)
-        self._locs_norm = None if self._locs_norm_t is None else self._to_numpy(self._locs_norm_t)
+        self._locs_norm = None if self._locs_norm_t is None else self._to_numpy(self._locs_norm_t[:obs_size])
         self._grid_norm = None if self._grid_norm_t is None else self._to_numpy(self._grid_norm_t)
-        self._Weights_raw = None if self._Weights_raw_t is None else self._to_numpy(self._Weights_raw_t)
+        self._Weights_raw = None if self._Weights_raw_t is None else self._to_numpy(self._Weights_raw_t[:, :obs_size])
         self.I_mask = None if self._I_mask_bool_t is None else self._to_numpy(self._I_mask_bool_t)
 
     def _set_i_mask(self, I_mask):
@@ -136,6 +143,71 @@ class II_BTD_Opt_GPU:
         self._I_mask_bool_t = self._to_bool_tensor(I_mask)
         self._I_mask_t = self._I_mask_bool_t.to(dtype=self.dtype)
         self.I_mask = self._to_numpy(self._I_mask_bool_t)
+
+    def _set_observation_storage(
+        self,
+        sensor_locs_t,
+        locs_norm_t,
+        Gamma_t,
+        Omega_t,
+        Weights_raw_t,
+    ):
+        obs_size = int(sensor_locs_t.shape[0])
+        self._sensor_locs_t = sensor_locs_t
+        self._locs_norm_t = locs_norm_t
+        self._Gamma_t = Gamma_t
+        self._Omega_t = Omega_t
+        self._Weights_raw_t = Weights_raw_t
+        self._obs_size = obs_size
+        self._obs_capacity = obs_size
+
+    def _ensure_observation_capacity(self, required_size, K):
+        required_size = int(required_size)
+        K = int(K)
+        current_size = int(self._obs_size)
+        current_capacity = int(self._obs_capacity)
+
+        if self._Gamma_t is not None and self._Gamma_t.ndim == 2 and self._Gamma_t.shape[1] != K:
+            if current_size > 0:
+                raise ValueError(
+                    f"Cannot change observation band dimension from {self._Gamma_t.shape[1]} to {K} "
+                    "while cached observations are present."
+                )
+            current_capacity = 0
+
+        if (
+            self._sensor_locs_t is not None
+            and self._Gamma_t is not None
+            and self._Omega_t is not None
+            and self._locs_norm_t is not None
+            and self._Weights_raw_t is not None
+            and current_capacity >= required_size
+            and self._Gamma_t.shape[1] == K
+        ):
+            return
+
+        new_capacity = max(required_size, 16 if current_capacity <= 0 else current_capacity * 2)
+        N_grid = self.N1 * self.N2
+
+        sensor_locs_t = torch.empty((new_capacity, 2), dtype=self.dtype, device=self.device)
+        locs_norm_t = torch.empty((new_capacity, 2), dtype=self.dtype, device=self.device)
+        Gamma_t = torch.empty((new_capacity, K), dtype=self.dtype, device=self.device)
+        Omega_t = torch.empty((new_capacity, K), dtype=self.dtype, device=self.device)
+        Weights_raw_t = torch.empty((N_grid, new_capacity), dtype=self.dtype, device=self.device)
+
+        if current_size > 0:
+            sensor_locs_t[:current_size].copy_(self._sensor_locs_t[:current_size])
+            locs_norm_t[:current_size].copy_(self._locs_norm_t[:current_size])
+            Gamma_t[:current_size].copy_(self._Gamma_t[:current_size])
+            Omega_t[:current_size].copy_(self._Omega_t[:current_size])
+            Weights_raw_t[:, :current_size].copy_(self._Weights_raw_t[:, :current_size])
+
+        self._sensor_locs_t = sensor_locs_t
+        self._locs_norm_t = locs_norm_t
+        self._Gamma_t = Gamma_t
+        self._Omega_t = Omega_t
+        self._Weights_raw_t = Weights_raw_t
+        self._obs_capacity = new_capacity
 
     def load_state_from(self, src_model):
         for name in ("Theta", "Phi", "Sr", "H_hat"):
@@ -146,6 +218,52 @@ class II_BTD_Opt_GPU:
                 if hasattr(self, tensor_attr):
                     setattr(self, tensor_attr, self._to_tensor(value))
         return self
+
+    def release_device_memory(self):
+        """Drop GPU-resident tensors once the solver instance is retired."""
+        tensor_attrs = (
+            "_Theta_t",
+            "_Phi_t",
+            "_Sr_t",
+            "_H_hat_t",
+            "_sensor_locs_t",
+            "_Gamma_t",
+            "_Omega_t",
+            "_grid_coords_t",
+            "_locs_norm_t",
+            "_grid_norm_t",
+            "_Weights_raw_t",
+            "_I_mask_bool_t",
+            "_I_mask_t",
+            "_PhiOmPhiT_all",
+            "_PhiGam_all",
+        )
+        array_attrs = (
+            "Theta",
+            "Phi",
+            "Sr",
+            "H_hat",
+            "_sensor_locs",
+            "_Gamma",
+            "_Omega",
+            "_grid_coords",
+            "_locs_norm",
+            "_grid_norm",
+            "_Weights_raw",
+            "I_mask",
+        )
+        for name in tensor_attrs:
+            if hasattr(self, name):
+                setattr(self, name, None)
+        for name in array_attrs:
+            if hasattr(self, name):
+                setattr(self, name, None)
+        self._initialized = False
+        self._obs_size = 0
+        self._obs_capacity = 0
+
+    def close(self):
+        self.release_device_memory()
 
     # =================================================================
     # Kernel and features
@@ -235,8 +353,9 @@ class II_BTD_Opt_GPU:
     # =================================================================
 
     def _precompute_phi_dependent(self, Omega, Gamma):
-        self._PhiOmPhiT_all = torch.einsum("rk,mk,sk->mrs", self._Phi_t, Omega, self._Phi_t)
-        self._PhiGam_all = torch.einsum("rk,mk->mr", self._Phi_t, Gamma * Omega)
+        phi_om_phi_t_all = torch.einsum("rk,mk,sk->mrs", self._Phi_t, Omega, self._Phi_t)
+        phi_gam_all = torch.einsum("rk,mk->mr", self._Phi_t, Gamma * Omega)
+        return phi_om_phi_t_all, phi_gam_all
 
     # =================================================================
     # Step 1: Theta update
@@ -253,9 +372,7 @@ class II_BTD_Opt_GPU:
         grid_indices=None,
         debugFlag=False,
     ):
-        self._precompute_phi_dependent(Omega, Gamma)
-        PhiOmPhiT = self._PhiOmPhiT_all
-        PhiGam = self._PhiGam_all
+        PhiOmPhiT, PhiGam = self._precompute_phi_dependent(Omega, Gamma)
 
         if grid_indices is None:
             grid_idx_t = torch.arange(self.N1 * self.N2, dtype=torch.long, device=self.device)
@@ -608,16 +725,17 @@ class II_BTD_Opt_GPU:
         self._H_hat_t = torch.einsum("rxy,rk->xyk", self._Sr_t, self._Phi_t)
 
         self._initialized = True
-        self._sensor_locs_t = sensor_locs_t.clone()
-        self._Gamma_t = Gamma_t.clone()
-        self._Omega_t = Omega_t.clone()
-        self._grid_coords_t = grid_coords_t.clone()
-        self._locs_norm_t = locs_norm.clone()
-        self._grid_norm_t = grid_norm.clone()
-        self._Weights_raw_t = Weights_raw.clone()
+        self._grid_coords_t = grid_coords_t
+        self._grid_norm_t = grid_norm
+        self._set_observation_storage(
+            sensor_locs_t=sensor_locs_t,
+            locs_norm_t=locs_norm,
+            Gamma_t=Gamma_t,
+            Omega_t=Omega_t,
+            Weights_raw_t=Weights_raw,
+        )
 
-        self._sync_public_state()
-        self._sync_public_cache()
+        self._sync_public_state(names=("Phi", "Sr", "H_hat"))
         return self
 
     # =================================================================
@@ -649,10 +767,11 @@ class II_BTD_Opt_GPU:
         self._Gamma_t = torch.empty((0, K), dtype=self.dtype, device=self.device)
         self._Omega_t = torch.empty((0, K), dtype=self.dtype, device=self.device)
         self._Weights_raw_t = torch.empty((N_grid, 0), dtype=self.dtype, device=self.device)
+        self._obs_size = 0
+        self._obs_capacity = 0
 
         self._initialized = True
-        self._sync_public_state()
-        self._sync_public_cache()
+        self._sync_public_state(names=("Phi", "Sr", "H_hat"))
         return self
 
     def fit_incremental(
@@ -693,19 +812,29 @@ class II_BTD_Opt_GPU:
         new_omega_t = self._to_tensor(np.atleast_2d(new_omega))
         n_new = int(new_sensor_locs_t.shape[0])
 
-        self._sensor_locs_t = torch.cat([self._sensor_locs_t, new_sensor_locs_t], dim=0)
+        current_size = int(self._obs_size)
+        M_total = current_size + n_new
+        K = int(new_gamma_t.shape[1])
+        self._ensure_observation_capacity(M_total, K)
+
+        start = current_size
+        end = M_total
+        self._sensor_locs_t[start:end].copy_(new_sensor_locs_t)
         new_locs_norm = self._normalize(new_sensor_locs_t)
-        self._locs_norm_t = torch.cat([self._locs_norm_t, new_locs_norm], dim=0)
-        self._Gamma_t = torch.cat([self._Gamma_t, new_gamma_t], dim=0)
-        self._Omega_t = torch.cat([self._Omega_t, new_omega_t], dim=0)
+        self._locs_norm_t[start:end].copy_(new_locs_norm)
+        self._Gamma_t[start:end].copy_(new_gamma_t)
+        self._Omega_t[start:end].copy_(new_omega_t)
 
         new_dists = torch.cdist(self._grid_norm_t, new_locs_norm)
         new_weights = self._epanechnikov_kernel(new_dists)
-        self._Weights_raw_t = torch.cat([self._Weights_raw_t, new_weights], dim=1)
+        self._Weights_raw_t[:, start:end].copy_(new_weights)
+        self._obs_size = M_total
 
-        M_total = int(self._sensor_locs_t.shape[0])
         N_grid = self.N1 * self.N2
-        K = int(self._Gamma_t.shape[1])
+        locs_norm_t = self._locs_norm_t[:M_total]
+        Gamma_t = self._Gamma_t[:M_total]
+        Omega_t = self._Omega_t[:M_total]
+        Weights_raw_t = self._Weights_raw_t[:, :M_total]
 
         affected_grids = self._get_affected_grids(new_locs_norm)
         I_flat = self._I_mask_bool_t.reshape(-1)
@@ -716,8 +845,7 @@ class II_BTD_Opt_GPU:
         if M_total < self.dim_poly:
             if debugFlag:
                 print(f"  Too few sensors ({M_total} < {self.dim_poly}), skipping GPU update.")
-            self._sync_public_state()
-            self._sync_public_cache()
+            self._sync_public_state(names=("Phi", "Sr", "H_hat"))
             return self
 
         if self._Phi_t.shape[1] != K:
@@ -731,21 +859,21 @@ class II_BTD_Opt_GPU:
             Sr_old = self._Sr_t.clone()
 
             self._update_theta(
-                self._locs_norm_t,
+                locs_norm_t,
                 self._grid_norm_t,
-                self._Gamma_t,
-                self._Omega_t,
-                self._Weights_raw_t,
+                Gamma_t,
+                Omega_t,
+                Weights_raw_t,
                 I_flat,
                 grid_indices=affected_grids,
                 debugFlag=debugFlag,
             )
             self._update_phi_vectorized(
-                self._locs_norm_t,
+                locs_norm_t,
                 self._grid_norm_t,
-                self._Gamma_t,
-                self._Omega_t,
-                self._Weights_raw_t,
+                Gamma_t,
+                Omega_t,
+                Weights_raw_t,
                 I_flat,
                 debugFlag=debugFlag,
             )
@@ -765,8 +893,7 @@ class II_BTD_Opt_GPU:
                 break
 
         self._H_hat_t = torch.einsum("rxy,rk->xyk", self._Sr_t, self._Phi_t)
-        self._sync_public_state()
-        self._sync_public_cache()
+        self._sync_public_state(names=("Phi", "Sr", "H_hat"))
         return self
 
     # =================================================================
@@ -816,16 +943,19 @@ class II_BTD_Opt_GPU:
         return nmse
 
     def get_current_map(self):
-        self._sync_public_state()
-        return self.H_hat.copy()
+        if self._H_hat_t is None:
+            return None if self.H_hat is None else self.H_hat.copy()
+        return self._to_numpy(self._H_hat_t).copy()
 
     def get_source_maps(self):
-        self._sync_public_state()
-        return self.Sr.copy()
+        if self._Sr_t is None:
+            return None if self.Sr is None else self.Sr.copy()
+        return self._to_numpy(self._Sr_t).copy()
 
     def get_spectra(self):
-        self._sync_public_state()
-        return self.Phi.copy()
+        if self._Phi_t is None:
+            return None if self.Phi is None else self.Phi.copy()
+        return self._to_numpy(self._Phi_t).copy()
 
 
 II_BTD_Optimized_GPU = II_BTD_Opt_GPU

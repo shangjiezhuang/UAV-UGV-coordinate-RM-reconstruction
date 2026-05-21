@@ -1,0 +1,14 @@
+这个代码中采用 Greedy UAV 路径规划 + 环境内置 UGV 启发式移动，有量化采样。
+
+UAV 不再使用 PPO 策略网络。每一步都会基于当前 planner/bootstrap target，在与环境一致的
+方向集合和 UAV step_size 上做宏动作路径搜索：候选路径必须能到达当前目标点，路径评分优先
+最大化累计不确定性，默认允许比最短宏动作路径多 2 个动作用于探索高不确定性区域。
+
+量化版本会根据当前路径首段的不确定性同时选择 sensing bandwidth ratio 和 quant bits：
+先把不确定性裁剪到 [0, 1]，再按排序后的候选档位均匀分桶。默认配置下，
+bandwidth_ratios=[0.2, 0.3, 0.5, 0.6] 四档都会被使用，quant_bits=[10, 8, 6]，默认 10 bit
+三档也都会被使用；不确定性越高，选择越大的 bandwidth ratio 和 bit。
+
+示例：
+
+python Greedy_heuristic_quant/train.py --eval_episodes 1 --episode_max_steps 20 --iibtd_backend cpu
