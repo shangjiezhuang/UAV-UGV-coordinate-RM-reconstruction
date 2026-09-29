@@ -1,0 +1,24 @@
+{
+  "datasets": {
+    "RadioSeerDPM100PSD": 10024,
+    "FARMOmniDPM100PSD_251": 2008
+  },
+  "processed_maps": 12032,
+  "sampling_region": "non-building cells",
+  "runtime_spectrum_seed": 42,
+  "map_minimum_global": 1.9879740638156593e-09,
+  "map_minimum_99th_percentile": 7.795976720845723e-06,
+  "map_maximum_99th_percentile": 8.205384741944446,
+  "map_maximum_global": 8.205384741944446,
+  "fixed_raw_min": 0.0,
+  "fixed_raw_max": 8.75,
+  "log_offset": 1e-06,
+  "fixed_log_min": -13.815510557964274,
+  "fixed_log_max": 2.169053814391834,
+  "noiseless_maps_covered_fraction": 1.0,
+  "training_scene_count": 8,
+  "training_scene_clean_max": 8.205384741944446,
+  "training_scene_max_noise_std": 0.08266095738819793,
+  "training_scene_clean_plus_6sigma": 8.701350486273633,
+  "expected_upper_clip_fraction": 1.4534239813132565e-16
+}
