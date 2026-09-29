@@ -1,0 +1,96 @@
+{
+  "source_dataset": "jliang097/FARM_training_test",
+  "source_files": [
+    "D1/scene_4.tar.gz",
+    "D1/scene_7.tar.gz",
+    "D1/scene_9.tar.gz"
+  ],
+  "output_root": "FARMOmniDPM100PSD",
+  "selected_base_samples": 251,
+  "psd_variants_per_crop": 8,
+  "total_variant_samples": 2008,
+  "K": 30,
+  "crop_size": 100,
+  "source_crop_size": 512,
+  "crop_mode": "farm_omni_selected_100_from_512",
+  "antenna_pattern": "iso",
+  "farm_spatial_layer_index": 4,
+  "npz_core_array_order": "image_yx",
+  "npz_core_arrays": [
+    "S",
+    "building_mask",
+    "non_building_mask",
+    "antenna",
+    "gain_DPM",
+    "buildings_complete",
+    "gain_DPM_nonbuilding"
+  ],
+  "npz_xy_aliases": [
+    "building_mask_xy",
+    "non_building_mask_xy"
+  ],
+  "spectrum_policy": {
+    "center_mode": "random",
+    "center_sampling": "uniform_random_integer_1_to_K",
+    "normalization": "sum(Phi)=K",
+    "variant_specs": [
+      {
+        "n_sinc": 4,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 1.5,
+        "width_max": 3.0
+      },
+      {
+        "n_sinc": 3,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 2.0,
+        "width_max": 4.0
+      },
+      {
+        "n_sinc": 4,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 4.0,
+        "width_max": 8.0
+      },
+      {
+        "n_sinc": 3,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 4.0,
+        "width_max": 8.0
+      },
+      {
+        "n_sinc": 1,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 2.0,
+        "width_max": 4.0
+      },
+      {
+        "n_sinc": 4,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 4.0,
+        "width_max": 8.0
+      },
+      {
+        "n_sinc": 4,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 4.0,
+        "width_max": 8.0
+      },
+      {
+        "n_sinc": 3,
+        "amp_min": 0.5,
+        "amp_max": 2.0,
+        "width_min": 1.5,
+        "width_max": 3.0
+      }
+    ]
+  },
+  "gain_normalization": "Per selected 100x100 crop, non-building FARM layer values are linearly scaled to uint8 1..255; building pixels are 0 and S=1e-6."
+}

@@ -1,0 +1,127 @@
+{
+  "sample_name": "scene675_tx2_x128_y111_s100_psd004",
+  "base_name": "scene675_tx2_x128_y111_s100",
+  "scene_id": 675,
+  "tx_index": 2,
+  "source_dataset_root": "D:\\RadioMapSeer",
+  "source_gain_DPM_png": "gain/DPM/675_2.png",
+  "crop_size": 100,
+  "crop_top_left_image_xy": [
+    128,
+    111
+  ],
+  "crop_bottom_right_image_xy_inclusive": [
+    227,
+    210
+  ],
+  "crop_mode": "uav_ugv_obstacle_aware_100_from_128",
+  "crop_seed": 2509474805,
+  "tx_edge_margin": 16,
+  "tx_global_json_xy": [
+    196,
+    94
+  ],
+  "tx_global_image_xy": [
+    196,
+    161
+  ],
+  "tx_local_crop_image_xy": [
+    68,
+    50
+  ],
+  "tx_local_crop_cartesian_xy": [
+    68,
+    49
+  ],
+  "coordinate_note": "RadioMapSeer png uses image coordinates with top-left origin; y_img = 255 - y_json.",
+  "tensor_model": "H[y,x,k] = S[y,x] * Phi[k] in image-order arrays.",
+  "K": 30,
+  "psd_variant_index": 4,
+  "psd_seed": 685138085,
+  "psd_spec": {
+    "n_sinc": 1,
+    "amplitude_range": [
+      0.5,
+      2.0
+    ],
+    "width_range": [
+      2.0,
+      4.0
+    ],
+    "center_mode": "random",
+    "normalization": "sum(Phi)=K",
+    "components_amp_center_width": [
+      [
+        1.9846447706222534,
+        3.0,
+        3.1114256381988525
+      ]
+    ],
+    "center_sampling": "uniform_random_integer_1_to_K"
+  },
+  "data_files": {
+    "arrays_npz": "arrays_npz/scene675_tx2_x128_y111_s100_psd004.npz",
+    "buildings_complete_png": "buildings_complete/scene675_tx2_x128_y111_s100.png",
+    "building_mask_png": "building_mask/scene675_tx2_x128_y111_s100.png",
+    "non_building_mask_png": "non_building_mask/scene675_tx2_x128_y111_s100.png",
+    "antenna_png": "antenna/scene675_tx2_x128_y111_s100.png",
+    "gain_DPM_png": "gain_DPM/scene675_tx2_x128_y111_s100.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene675_tx2_x128_y111_s100.png",
+    "metadata_json": "metadata/scene675_tx2_x128_y111_s100_psd004.json"
+  },
+  "stats": {
+    "building_ratio": 0.1593,
+    "non_building_ratio": 0.8407,
+    "S_min": 9.999999974752427e-07,
+    "S_max": 1.0,
+    "Phi_min": 0.0001917362678796053,
+    "Phi_max": 10.202500343322754,
+    "Phi_sum": 29.999999866238795,
+    "gain_nonbuilding_min": 0,
+    "gain_nonbuilding_max": 255,
+    "selection_metrics": {
+      "building_ratio": 0.1593,
+      "inner_building_ratio": 0.26558171745152354,
+      "center_building_ratio": 0.33416666666666667,
+      "edge_building_share": 0.037037037037037035,
+      "occupied_quadrants": 4,
+      "occupied_5x5_cells": 14,
+      "significant_components": 3,
+      "internal_components": 2,
+      "largest_component_fraction": 0.49843063402385435
+    }
+  },
+  "source_sample_name": "scene675_tx2_x121_y108_s128_psd004",
+  "source_base_name": "scene675_tx2_x121_y108_s128",
+  "source_crop_size": 128,
+  "crop_bounds_json_xy": {
+    "x_min": 128,
+    "x_max": 227,
+    "y_min": 45,
+    "y_max": 144
+  },
+  "source_crop_top_left_image_xy": [
+    121,
+    108
+  ],
+  "crop_offset_within_source_128_image_xy": [
+    7,
+    3
+  ],
+  "tx_offset_from_crop_center_image_xy": [
+    18,
+    0
+  ],
+  "source_data_files": {
+    "arrays_npz": "arrays_npz/scene675_tx2_x121_y108_s128_psd004.npz",
+    "buildings_complete_png": "buildings_complete/scene675_tx2_x121_y108_s128.png",
+    "building_mask_png": "building_mask/scene675_tx2_x121_y108_s128.png",
+    "non_building_mask_png": "non_building_mask/scene675_tx2_x121_y108_s128.png",
+    "antenna_png": "antenna/scene675_tx2_x121_y108_s128.png",
+    "gain_DPM_png": "gain_DPM/scene675_tx2_x121_y108_s128.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene675_tx2_x121_y108_s128.png",
+    "metadata_json": "metadata/scene675_tx2_x121_y108_s128_psd004.json"
+  },
+  "selection_score": 4.67630131826742,
+  "npz_orientation_note": "Core NPZ arrays S, building_mask, non_building_mask, gain_DPM, antenna, buildings_complete, and gain_DPM_nonbuilding use image y,x order, matching RadioSeerClip100. Explicit *_xy aliases are transposed x,y views."
+}

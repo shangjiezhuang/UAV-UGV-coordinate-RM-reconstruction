@@ -1,0 +1,142 @@
+{
+  "sample_name": "scene618_tx17_x68_y93_s100_psd005",
+  "base_name": "scene618_tx17_x68_y93_s100",
+  "scene_id": 618,
+  "tx_index": 17,
+  "source_dataset_root": "D:\\RadioMapSeer",
+  "source_gain_DPM_png": "gain/DPM/618_17.png",
+  "crop_size": 100,
+  "crop_top_left_image_xy": [
+    68,
+    93
+  ],
+  "crop_bottom_right_image_xy_inclusive": [
+    167,
+    192
+  ],
+  "crop_mode": "uav_ugv_obstacle_aware_100_from_128",
+  "crop_seed": 3860307241,
+  "tx_edge_margin": 16,
+  "tx_global_json_xy": [
+    93,
+    146
+  ],
+  "tx_global_image_xy": [
+    93,
+    109
+  ],
+  "tx_local_crop_image_xy": [
+    25,
+    16
+  ],
+  "tx_local_crop_cartesian_xy": [
+    25,
+    83
+  ],
+  "coordinate_note": "RadioMapSeer png uses image coordinates with top-left origin; y_img = 255 - y_json.",
+  "tensor_model": "H[y,x,k] = S[y,x] * Phi[k] in image-order arrays.",
+  "K": 30,
+  "psd_variant_index": 5,
+  "psd_seed": 1551964377,
+  "psd_spec": {
+    "n_sinc": 4,
+    "amplitude_range": [
+      0.5,
+      2.0
+    ],
+    "width_range": [
+      4.0,
+      8.0
+    ],
+    "center_mode": "random",
+    "normalization": "sum(Phi)=K",
+    "components_amp_center_width": [
+      [
+        0.7953068017959595,
+        10.0,
+        5.446728229522705
+      ],
+      [
+        0.6604586243629456,
+        4.0,
+        7.187599182128906
+      ],
+      [
+        1.7251179218292236,
+        24.0,
+        7.42160177230835
+      ],
+      [
+        1.3746243715286255,
+        22.0,
+        6.486285209655762
+      ]
+    ],
+    "center_sampling": "uniform_random_integer_1_to_K"
+  },
+  "data_files": {
+    "arrays_npz": "arrays_npz/scene618_tx17_x68_y93_s100_psd005.npz",
+    "buildings_complete_png": "buildings_complete/scene618_tx17_x68_y93_s100.png",
+    "building_mask_png": "building_mask/scene618_tx17_x68_y93_s100.png",
+    "non_building_mask_png": "non_building_mask/scene618_tx17_x68_y93_s100.png",
+    "antenna_png": "antenna/scene618_tx17_x68_y93_s100.png",
+    "gain_DPM_png": "gain_DPM/scene618_tx17_x68_y93_s100.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene618_tx17_x68_y93_s100.png",
+    "metadata_json": "metadata/scene618_tx17_x68_y93_s100_psd005.json"
+  },
+  "stats": {
+    "building_ratio": 0.2328,
+    "non_building_ratio": 0.7672,
+    "S_min": 9.999999974752427e-07,
+    "S_max": 1.0,
+    "Phi_min": 0.04405345767736435,
+    "Phi_max": 3.053614377975464,
+    "Phi_sum": 29.99999998509884,
+    "gain_nonbuilding_min": 0,
+    "gain_nonbuilding_max": 255,
+    "selection_metrics": {
+      "building_ratio": 0.2328,
+      "inner_building_ratio": 0.2460180055401662,
+      "center_building_ratio": 0.23166666666666666,
+      "edge_building_share": 0.3896048109965636,
+      "occupied_quadrants": 4,
+      "occupied_5x5_cells": 19,
+      "significant_components": 9,
+      "internal_components": 4,
+      "largest_component_fraction": 0.1958762886597938
+    }
+  },
+  "source_sample_name": "scene618_tx17_x43_y93_s128_psd005",
+  "source_base_name": "scene618_tx17_x43_y93_s128",
+  "source_crop_size": 128,
+  "crop_bounds_json_xy": {
+    "x_min": 68,
+    "x_max": 167,
+    "y_min": 63,
+    "y_max": 162
+  },
+  "source_crop_top_left_image_xy": [
+    43,
+    93
+  ],
+  "crop_offset_within_source_128_image_xy": [
+    25,
+    0
+  ],
+  "tx_offset_from_crop_center_image_xy": [
+    -25,
+    -34
+  ],
+  "source_data_files": {
+    "arrays_npz": "arrays_npz/scene618_tx17_x43_y93_s128_psd005.npz",
+    "buildings_complete_png": "buildings_complete/scene618_tx17_x43_y93_s128.png",
+    "building_mask_png": "building_mask/scene618_tx17_x43_y93_s128.png",
+    "non_building_mask_png": "non_building_mask/scene618_tx17_x43_y93_s128.png",
+    "antenna_png": "antenna/scene618_tx17_x43_y93_s128.png",
+    "gain_DPM_png": "gain_DPM/scene618_tx17_x43_y93_s128.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene618_tx17_x43_y93_s128.png",
+    "metadata_json": "metadata/scene618_tx17_x43_y93_s128_psd005.json"
+  },
+  "selection_score": 4.784185567010308,
+  "npz_orientation_note": "Core NPZ arrays S, building_mask, non_building_mask, gain_DPM, antenna, buildings_complete, and gain_DPM_nonbuilding use image y,x order, matching RadioSeerClip100. Explicit *_xy aliases are transposed x,y views."
+}

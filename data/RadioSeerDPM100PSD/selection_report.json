@@ -1,0 +1,88 @@
+{
+  "source_root": "RadioSeerDPM128PSD_4096x8",
+  "output_root": "RadioSeerDPM100PSD",
+  "source_base_samples": 4096,
+  "selected_base_samples": 1253,
+  "psd_variants_per_crop": 8,
+  "total_variant_samples": 10024,
+  "crop_size": 100,
+  "source_crop_size": 128,
+  "tx_edge_margin": 16,
+  "building_ratio_filter": [
+    0.12,
+    0.26
+  ],
+  "uav_ugv_obstacle_filters": {
+    "center_building_ratio": [
+      0.08,
+      0.45
+    ],
+    "min_inner_building_ratio": 0.08,
+    "max_edge_building_share": 0.4,
+    "min_occupied_quadrants": 3,
+    "min_occupied_5x5_cells": 6,
+    "min_significant_components": 2,
+    "min_internal_components": 1,
+    "max_largest_component_fraction": 0.7
+  },
+  "skipped": {
+    "tx_margin": 0,
+    "quick_geometry": 2568,
+    "connected_components": 279
+  },
+  "selected_building_ratio": {
+    "min": 0.12,
+    "max": 0.26,
+    "mean": 0.19540608486789432
+  },
+  "selected_tx_local_image_x": {
+    "min": 16,
+    "max": 83
+  },
+  "selected_tx_local_image_y": {
+    "min": 16,
+    "max": 83
+  },
+  "selected_center_building_ratio": {
+    "min": 0.09166666666666666,
+    "max": 0.45,
+    "mean": 0.24415621385997688
+  },
+  "selected_inner_building_ratio": {
+    "min": 0.125,
+    "max": 0.403393351800554,
+    "mean": 0.2324725431314581
+  },
+  "selected_edge_building_share": {
+    "min": 0.0,
+    "max": 0.4,
+    "mean": 0.310648527966254
+  },
+  "selected_significant_components": {
+    "min": 2,
+    "max": 22,
+    "mean": 8.040832666132907
+  },
+  "selected_internal_components": {
+    "min": 1,
+    "max": 16,
+    "mean": 3.641313050440352
+  },
+  "selected_largest_component_fraction": {
+    "min": 0.0666360294117647,
+    "max": 0.6980728051391863,
+    "mean": 0.30910044274135784
+  },
+  "post_selection_merged_sources": {
+    "RadioSeerClip100": {
+      "base_samples": 4,
+      "variant_samples": 32,
+      "spectrum_mode": "mappo_random"
+    }
+  },
+  "spectrum_cleanup": {
+    "center_mode": "random",
+    "center_sampling": "uniform_random_integer_1_to_K",
+    "n_sinc_and_width": "preserved from manifest rows"
+  }
+}

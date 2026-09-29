@@ -1,0 +1,127 @@
+{
+  "sample_name": "scene680_tx73_x70_y124_s100_psd004",
+  "base_name": "scene680_tx73_x70_y124_s100",
+  "scene_id": 680,
+  "tx_index": 73,
+  "source_dataset_root": "D:\\RadioMapSeer",
+  "source_gain_DPM_png": "gain/DPM/680_73.png",
+  "crop_size": 100,
+  "crop_top_left_image_xy": [
+    70,
+    124
+  ],
+  "crop_bottom_right_image_xy_inclusive": [
+    169,
+    223
+  ],
+  "crop_mode": "uav_ugv_obstacle_aware_100_from_128",
+  "crop_seed": 2148165902,
+  "tx_edge_margin": 16,
+  "tx_global_json_xy": [
+    86,
+    104
+  ],
+  "tx_global_image_xy": [
+    86,
+    151
+  ],
+  "tx_local_crop_image_xy": [
+    16,
+    27
+  ],
+  "tx_local_crop_cartesian_xy": [
+    16,
+    72
+  ],
+  "coordinate_note": "RadioMapSeer png uses image coordinates with top-left origin; y_img = 255 - y_json.",
+  "tensor_model": "H[y,x,k] = S[y,x] * Phi[k] in image-order arrays.",
+  "K": 30,
+  "psd_variant_index": 4,
+  "psd_seed": 3627677272,
+  "psd_spec": {
+    "n_sinc": 1,
+    "amplitude_range": [
+      0.5,
+      2.0
+    ],
+    "width_range": [
+      2.0,
+      4.0
+    ],
+    "center_mode": "random",
+    "normalization": "sum(Phi)=K",
+    "components_amp_center_width": [
+      [
+        1.3697233200073242,
+        8.0,
+        3.2301242351531982
+      ]
+    ],
+    "center_sampling": "uniform_random_integer_1_to_K"
+  },
+  "data_files": {
+    "arrays_npz": "arrays_npz/scene680_tx73_x70_y124_s100_psd004.npz",
+    "buildings_complete_png": "buildings_complete/scene680_tx73_x70_y124_s100.png",
+    "building_mask_png": "building_mask/scene680_tx73_x70_y124_s100.png",
+    "non_building_mask_png": "non_building_mask/scene680_tx73_x70_y124_s100.png",
+    "antenna_png": "antenna/scene680_tx73_x70_y124_s100.png",
+    "gain_DPM_png": "gain_DPM/scene680_tx73_x70_y124_s100.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene680_tx73_x70_y124_s100.png",
+    "metadata_json": "metadata/scene680_tx73_x70_y124_s100_psd004.json"
+  },
+  "stats": {
+    "building_ratio": 0.1939,
+    "non_building_ratio": 0.8061,
+    "S_min": 9.999999974752427e-07,
+    "S_max": 1.0,
+    "Phi_min": 0.0003576220478862524,
+    "Phi_max": 9.580960273742676,
+    "Phi_sum": 29.99999994976679,
+    "gain_nonbuilding_min": 0,
+    "gain_nonbuilding_max": 255,
+    "selection_metrics": {
+      "building_ratio": 0.1939,
+      "inner_building_ratio": 0.2917243767313019,
+      "center_building_ratio": 0.3572222222222222,
+      "edge_building_share": 0.13099535843218155,
+      "occupied_quadrants": 4,
+      "occupied_5x5_cells": 17,
+      "significant_components": 5,
+      "internal_components": 4,
+      "largest_component_fraction": 0.3733883445074781
+    }
+  },
+  "source_sample_name": "scene680_tx73_x70_y124_s128_psd004",
+  "source_base_name": "scene680_tx73_x70_y124_s128",
+  "source_crop_size": 128,
+  "crop_bounds_json_xy": {
+    "x_min": 70,
+    "x_max": 169,
+    "y_min": 32,
+    "y_max": 131
+  },
+  "source_crop_top_left_image_xy": [
+    70,
+    124
+  ],
+  "crop_offset_within_source_128_image_xy": [
+    0,
+    0
+  ],
+  "tx_offset_from_crop_center_image_xy": [
+    -34,
+    -23
+  ],
+  "source_data_files": {
+    "arrays_npz": "arrays_npz/scene680_tx73_x70_y124_s128_psd004.npz",
+    "buildings_complete_png": "buildings_complete/scene680_tx73_x70_y124_s128.png",
+    "building_mask_png": "building_mask/scene680_tx73_x70_y124_s128.png",
+    "non_building_mask_png": "non_building_mask/scene680_tx73_x70_y124_s128.png",
+    "antenna_png": "antenna/scene680_tx73_x70_y124_s128.png",
+    "gain_DPM_png": "gain_DPM/scene680_tx73_x70_y124_s128.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene680_tx73_x70_y124_s128.png",
+    "metadata_json": "metadata/scene680_tx73_x70_y124_s128_psd004.json"
+  },
+  "selection_score": 4.950756059824651,
+  "npz_orientation_note": "Core NPZ arrays S, building_mask, non_building_mask, gain_DPM, antenna, buildings_complete, and gain_DPM_nonbuilding use image y,x order, matching RadioSeerClip100. Explicit *_xy aliases are transposed x,y views."
+}

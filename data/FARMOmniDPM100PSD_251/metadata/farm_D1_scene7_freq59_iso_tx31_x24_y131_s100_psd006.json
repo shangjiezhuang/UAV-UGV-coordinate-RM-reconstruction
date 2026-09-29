@@ -1,0 +1,108 @@
+{
+  "sample_name": "farm_D1_scene7_freq59_iso_tx31_x24_y131_s100_psd006",
+  "base_name": "farm_D1_scene7_freq59_iso_tx31_x24_y131_s100",
+  "source_dataset": "jliang097/FARM_training_test",
+  "source_dataset_split": "D1",
+  "scene_id": 7,
+  "frequency": "freq59",
+  "antenna_pattern": "iso",
+  "tx_index": 31,
+  "tx_height": 20,
+  "source_npy": "7/freq59/iso/tx31_yaw0.npy",
+  "crop_size": 100,
+  "crop_top_left_image_xy": [
+    24,
+    131
+  ],
+  "crop_bottom_right_image_xy_inclusive": [
+    123,
+    230
+  ],
+  "crop_mode": "farm_omni_selected_100_from_512",
+  "tx_edge_margin": 16,
+  "tx_global_image_xy": [
+    83,
+    166
+  ],
+  "tx_local_crop_image_xy": [
+    59,
+    35
+  ],
+  "tx_local_crop_cartesian_xy": [
+    59,
+    64
+  ],
+  "tensor_model": "H[y,x,k] = S[y,x] * Phi[k] in image-order arrays.",
+  "farm_spatial_layer_index": 4,
+  "K": 30,
+  "psd_variant_index": 6,
+  "psd_seed": 819627459,
+  "psd_spec": {
+    "n_sinc": 4,
+    "amplitude_range": [
+      0.5,
+      2.0
+    ],
+    "width_range": [
+      4.0,
+      8.0
+    ],
+    "center_mode": "random",
+    "normalization": "sum(Phi)=K",
+    "components_amp_center_width": [
+      [
+        1.1503463983535767,
+        18.0,
+        5.445086479187012
+      ],
+      [
+        1.3000596761703491,
+        18.0,
+        7.177889347076416
+      ],
+      [
+        1.2899878025054932,
+        23.0,
+        5.6595563888549805
+      ],
+      [
+        1.8367152214050293,
+        28.0,
+        6.562422275543213
+      ]
+    ],
+    "center_sampling": "uniform_random_integer_1_to_K"
+  },
+  "data_files": {
+    "arrays_npz": "arrays_npz/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100_psd006.npz",
+    "metadata_json": "metadata/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100_psd006.json",
+    "gain_DPM_png": "gain_DPM/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png",
+    "building_mask_png": "building_mask/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png",
+    "non_building_mask_png": "non_building_mask/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png",
+    "antenna_png": "antenna/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png",
+    "buildings_complete_png": "buildings_complete/farm_D1_scene7_freq59_iso_tx31_x24_y131_s100.png"
+  },
+  "stats": {
+    "building_ratio": 0.1042,
+    "non_building_ratio": 0.8958,
+    "center_building_ratio": 0.030833333333333334,
+    "inner_building_ratio": 0.061980609418282546,
+    "edge_building_share": 0.43857965451055664,
+    "occupied_quadrants": 2,
+    "occupied_5x5_cells": 8,
+    "significant_components": 5,
+    "internal_components": 4,
+    "largest_component_fraction": 0.46257197696737046,
+    "S_min": 9.999999974752427e-07,
+    "S_max": 1.0,
+    "Phi_min": 0.017163846641778946,
+    "Phi_max": 2.420161247253418,
+    "Phi_sum": 30.0,
+    "raw_signal_min": 162,
+    "raw_signal_max": 192,
+    "gain_nonbuilding_min": 1,
+    "gain_nonbuilding_max": 255
+  },
+  "npz_orientation_note": "Core NPZ arrays S, building_mask, non_building_mask, gain_DPM, antenna, buildings_complete, and gain_DPM_nonbuilding use image y,x order. Explicit *_xy aliases are transposed x,y views."
+}

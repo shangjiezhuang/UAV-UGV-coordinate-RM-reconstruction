@@ -1,0 +1,35 @@
+用 Deep unfolding 思想加速 IIBTD 算法的求解，并且满足 UAV 序贯采样的方式。
+
+当前实现先固定 R=1，用 RadioSeerDPM128PSD_4096x8 做算法测试和训练：
+
+S = {Theta, Phi, Sr, H_hat}
+
+每次 UAV 输入一个或一批新事件：
+
+z: 当前位置
+gamma: 当前观测
+Omega: 当前观测掩码
+
+网络功能：
+
+(Theta_t, Phi_t, Sr_t, H_hat_t) =
+f_du_iibtd(Theta_t-1, Phi_t-1, Sr_t-1, H_hat_t-1, z_t, gamma_t, Omega_t)
+
+实现要点：
+
+- Theta 使用 IIBTD_Opt_GPU 中 R=1 的 batched WLS 思路，在 GPU 上批量求解。
+- Phi 使用 R=1 非负闭式更新，并带可学习 blend。
+- Sr 使用 CNN proximal block 替代原 SVT/SVD 步骤。
+- 训练集默认每个 epoch 重新采样 UAV 轨迹，val/test 轨迹固定用于稳定评估。
+- 默认频段采样分成两部分：一部分使用全频段观测，另一部分使用从全频范围均匀抽取的连续频段观测；默认比例为 1:1，可通过 `--full-observation-ratio` 调整。
+- 训练入口默认要求 CUDA。
+- 训练过程会在输出目录保存 history.json、training_curves.png 和最终 best checkpoint 的 test_metrics.json。
+- 如果不显式指定 --output-dir，会在当前工作目录下创建 runs_radioseer_dpm_du_iibtd_YYYYMMDD_HHMMSS 格式的结果目录。
+
+GPU smoke train:
+
+python DU_IIBTD/train.py --device cuda --max-samples 2 --epochs 1 --spatial-points-min 8 --spatial-points-max 8 --update-batch-size 4 --T 1 --hidden 8 --theta-chunk-size 512 --phi-chunk-size 512 --batch-size 1 --output-dir /tmp/du_iibtd_smoke
+
+正式训练建议先从较轻的 mini-epoch 设置开始。这里 `train-samples-per-epoch` 表示每个 mini-epoch 只训练一部分样本，多个 mini-epoch 循环覆盖完整训练集；`update-batch-size-min/max` 表示每条 UAV 轨迹随机一个固定的 B，不同轨迹之间 B 可以不同：
+
+python DU_IIBTD/train.py --device cuda --max-samples 0 --epochs 30 --train-samples-per-epoch 1000 --val-interval 10 --val-max-samples 1000 --batch-size 1 --num-workers 2 --spatial-points-min 64 --spatial-points-max 160 --update-batch-size-min 3 --update-batch-size-max 16 --T 3 --hidden 32

@@ -1,0 +1,137 @@
+{
+  "sample_name": "scene407_tx23_x71_y100_s100_psd007",
+  "base_name": "scene407_tx23_x71_y100_s100",
+  "scene_id": 407,
+  "tx_index": 23,
+  "source_dataset_root": "D:\\RadioMapSeer",
+  "source_gain_DPM_png": "gain/DPM/407_23.png",
+  "crop_size": 100,
+  "crop_top_left_image_xy": [
+    71,
+    100
+  ],
+  "crop_bottom_right_image_xy_inclusive": [
+    170,
+    199
+  ],
+  "crop_mode": "uav_ugv_obstacle_aware_100_from_128",
+  "crop_seed": 3466670095,
+  "tx_edge_margin": 16,
+  "tx_global_json_xy": [
+    101,
+    104
+  ],
+  "tx_global_image_xy": [
+    101,
+    151
+  ],
+  "tx_local_crop_image_xy": [
+    30,
+    51
+  ],
+  "tx_local_crop_cartesian_xy": [
+    30,
+    48
+  ],
+  "coordinate_note": "RadioMapSeer png uses image coordinates with top-left origin; y_img = 255 - y_json.",
+  "tensor_model": "H[y,x,k] = S[y,x] * Phi[k] in image-order arrays.",
+  "K": 30,
+  "psd_variant_index": 7,
+  "psd_seed": 1838730590,
+  "psd_spec": {
+    "n_sinc": 3,
+    "amplitude_range": [
+      0.5,
+      2.0
+    ],
+    "width_range": [
+      1.5,
+      3.0
+    ],
+    "center_mode": "random",
+    "normalization": "sum(Phi)=K",
+    "components_amp_center_width": [
+      [
+        0.8693491816520691,
+        3.0,
+        2.156224250793457
+      ],
+      [
+        0.8579589128494263,
+        2.0,
+        2.44773006439209
+      ],
+      [
+        1.0523109436035156,
+        17.0,
+        2.154850721359253
+      ]
+    ],
+    "center_sampling": "uniform_random_integer_1_to_K"
+  },
+  "data_files": {
+    "arrays_npz": "arrays_npz/scene407_tx23_x71_y100_s100_psd007.npz",
+    "buildings_complete_png": "buildings_complete/scene407_tx23_x71_y100_s100.png",
+    "building_mask_png": "building_mask/scene407_tx23_x71_y100_s100.png",
+    "non_building_mask_png": "non_building_mask/scene407_tx23_x71_y100_s100.png",
+    "antenna_png": "antenna/scene407_tx23_x71_y100_s100.png",
+    "gain_DPM_png": "gain_DPM/scene407_tx23_x71_y100_s100.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene407_tx23_x71_y100_s100.png",
+    "metadata_json": "metadata/scene407_tx23_x71_y100_s100_psd007.json"
+  },
+  "stats": {
+    "building_ratio": 0.128,
+    "non_building_ratio": 0.872,
+    "S_min": 9.999999974752427e-07,
+    "S_max": 1.0,
+    "Phi_min": 0.006197645328938961,
+    "Phi_max": 6.803101539611816,
+    "Phi_sum": 29.99999982211739,
+    "gain_nonbuilding_min": 0,
+    "gain_nonbuilding_max": 255,
+    "selection_metrics": {
+      "building_ratio": 0.128,
+      "inner_building_ratio": 0.20238919667590027,
+      "center_building_ratio": 0.2841666666666667,
+      "edge_building_share": 0.08671875,
+      "occupied_quadrants": 4,
+      "occupied_5x5_cells": 13,
+      "significant_components": 7,
+      "internal_components": 5,
+      "largest_component_fraction": 0.31796875
+    }
+  },
+  "source_sample_name": "scene407_tx23_x48_y95_s128_psd007",
+  "source_base_name": "scene407_tx23_x48_y95_s128",
+  "source_crop_size": 128,
+  "crop_bounds_json_xy": {
+    "x_min": 71,
+    "x_max": 170,
+    "y_min": 56,
+    "y_max": 155
+  },
+  "source_crop_top_left_image_xy": [
+    48,
+    95
+  ],
+  "crop_offset_within_source_128_image_xy": [
+    23,
+    5
+  ],
+  "tx_offset_from_crop_center_image_xy": [
+    -20,
+    1
+  ],
+  "source_data_files": {
+    "arrays_npz": "arrays_npz/scene407_tx23_x48_y95_s128_psd007.npz",
+    "buildings_complete_png": "buildings_complete/scene407_tx23_x48_y95_s128.png",
+    "building_mask_png": "building_mask/scene407_tx23_x48_y95_s128.png",
+    "non_building_mask_png": "non_building_mask/scene407_tx23_x48_y95_s128.png",
+    "antenna_png": "antenna/scene407_tx23_x48_y95_s128.png",
+    "gain_DPM_png": "gain_DPM/scene407_tx23_x48_y95_s128.png",
+    "gain_DPM_nonbuilding_png": "gain_DPM_nonbuilding/scene407_tx23_x48_y95_s128.png",
+    "metadata_json": "metadata/scene407_tx23_x48_y95_s128_psd007.json"
+  },
+  "selection_score": 5.245706697777637,
+  "npz_orientation_note": "Core NPZ arrays S, building_mask, non_building_mask, gain_DPM, antenna, buildings_complete, and gain_DPM_nonbuilding use image y,x order, matching RadioSeerClip100. Explicit *_xy aliases are transposed x,y views."
+}

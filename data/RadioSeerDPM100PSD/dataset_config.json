@@ -1,0 +1,60 @@
+{
+  "source_root": "RadioSeerDPM128PSD_4096x8",
+  "output_root": "RadioSeerDPM100PSD",
+  "selected_base_samples": 1253,
+  "psd_variants_per_crop": 8,
+  "total_variant_samples": 10024,
+  "K": 30,
+  "crop_size": 100,
+  "source_crop_size": 128,
+  "crop_mode": "uav_ugv_obstacle_aware_100_from_128",
+  "tx_edge_margin": 16,
+  "building_ratio_filter": [
+    0.12,
+    0.26
+  ],
+  "uav_ugv_obstacle_filters": {
+    "center_building_ratio": [
+      0.08,
+      0.45
+    ],
+    "min_inner_building_ratio": 0.08,
+    "max_edge_building_share": 0.4,
+    "min_occupied_quadrants": 3,
+    "min_occupied_5x5_cells": 6,
+    "min_significant_components": 2,
+    "min_internal_components": 1,
+    "max_largest_component_fraction": 0.7
+  },
+  "npz_core_array_order": "image_yx",
+  "npz_core_arrays": [
+    "S",
+    "building_mask",
+    "non_building_mask",
+    "antenna",
+    "gain_DPM",
+    "buildings_complete",
+    "gain_DPM_nonbuilding"
+  ],
+  "npz_xy_aliases": [
+    "building_mask_xy",
+    "non_building_mask_xy"
+  ],
+  "actual_variant_samples": 10024,
+  "merged_sources": {
+    "RadioSeerClip100": {
+      "base_samples": 4,
+      "variant_samples": 32,
+      "merge_mode": "converted_to_existing_dpm100_psd_schema",
+      "spectrum_mode": "mappo_random"
+    }
+  },
+  "center_modes": [
+    "random"
+  ],
+  "spectrum_cleanup": {
+    "rule": "Preserve each row's n_sinc and width range; sample every sinc center uniformly from integer 1..K.",
+    "rng": "numpy.random.RandomState(psd_seed)",
+    "center_sampling": "uniform_random_integer_1_to_K"
+  }
+}
