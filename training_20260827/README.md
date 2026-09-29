@@ -33,4 +33,6 @@ ln -s ../data/FARMOmniDPM100PSD_251 FARMOmniDPM100PSD_251
 
 ## 归档检查（2026-09-29）
 
-全部 Python 文件通过语法检查，全部 shell 脚本通过 bash 语法检查。原有单元测试执行 70 项，66 项通过，4 项失败：test_auxiliary_observation_features_have_physical_semantics、test_optional_observation_groups_change_dims_only_when_enabled、test_energy_mask_exactly_preserves_minimum_future_reserve、test_quant_energy_mask_repeats_noquant_band_mask_over_quant_bits。失败涉及观测维度/辅助观测与能量掩码的断言；保留恢复出的历史代码与测试，没有为使测试通过而改动历史算法，也没有声称本次完整重跑复现了旧训练结果。
+全部 Python 文件与 shell 脚本通过语法检查。初次归档时恢复的旧测试仍包含 4 项过时断言：观测维度和辅助观测仍要求暴露已移除的信息，能量动作掩码仍要求为未来步预留能量。
+
+本次仅将这 4 项测试同步为 2026-09-14 已有的修正版：确认观测维度固定为 14/14/19、辅助观测为空，以及动作能量筛选只检查当前步。训练算法、环境、模型、配置和历史结果均未修改。修正后的完整测试共 70 项，全部通过。原始历史测试保留在前一个 Git 提交中。此次检查没有重新执行完整训练。

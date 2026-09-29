@@ -701,37 +701,30 @@ class OptimizationContractTest(unittest.TestCase):
             self.assertEqual(env._move_ugv(3, target_grid=target), 5)
             np.testing.assert_array_equal(env.ugv_pos, np.array([0.0, 5.0]))
 
-    def test_optional_observation_groups_change_dims_only_when_enabled(self) -> None:
-        noquant_config = NoQuantConfig()
-        noquant_config.obs.include_remaining_time = False
-        noquant_env = NoQuantEnvironment.__new__(NoQuantEnvironment)
-        noquant_env.config = noquant_config
-        noquant_env._setup_observation_spaces()
-        self.assertEqual(noquant_env.get_obs_dims(), {
-            "uav_obs": 15,
-            "ugv_obs": 15,
-            "critic_state": 20,
-        })
-
-        noquant_config.obs.include_remaining_time = True
-        noquant_env._setup_observation_spaces()
-        self.assertEqual(noquant_env.get_obs_dims(), {
-            "uav_obs": 16,
-            "ugv_obs": 16,
-            "critic_state": 21,
-        })
-
-        quant_config = QuantConfig()
-        quant_config.obs.include_remaining_time = True
-        quant_config.obs.include_quant_context = True
-        quant_env = QuantEnvironment.__new__(QuantEnvironment)
-        quant_env.config = quant_config
-        quant_env._setup_observation_spaces()
-        self.assertEqual(quant_env.get_obs_dims(), {
-            "uav_obs": 18,
-            "ugv_obs": 18,
-            "critic_state": 23,
-        })
+    def test_legacy_observation_flags_preserve_clean_dimensions(self) -> None:
+        for environment_type, config in (
+            (NoQuantEnvironment, NoQuantConfig()),
+            (QuantEnvironment, QuantConfig()),
+        ):
+            env = environment_type.__new__(environment_type)
+            env.config = config
+            quant_flags = (False, True) if hasattr(config.obs, "include_quant_context") else (False,)
+            for remaining_time in (False, True):
+                for quant_context in quant_flags:
+                    with self.subTest(
+                        variant=environment_type.__module__,
+                        remaining_time=remaining_time,
+                        quant_context=quant_context,
+                    ):
+                        config.obs.include_remaining_time = remaining_time
+                        if hasattr(config.obs, "include_quant_context"):
+                            config.obs.include_quant_context = quant_context
+                        env._setup_observation_spaces()
+                        self.assertEqual(env.get_obs_dims(), {
+                            "uav_obs": 14,
+                            "ugv_obs": 14,
+                            "critic_state": 19,
+                        })
 
     @staticmethod
     def _auxiliary_obs_stub(environment_type, config, *, quantized: bool):
@@ -754,31 +747,27 @@ class OptimizationContractTest(unittest.TestCase):
             env.source_max_packet_bits = 8.0 * config.comm.data_per_sample
         return env
 
-    def test_auxiliary_observation_features_have_physical_semantics(self) -> None:
-        noquant_config = NoQuantConfig()
-        noquant_config.obs.include_remaining_time = True
-        noquant_env = self._auxiliary_obs_stub(
-            NoQuantEnvironment,
-            noquant_config,
-            quantized=False,
-        )
-        noquant_features = noquant_env._extract_auxiliary_obs_features()
-        self.assertEqual(noquant_features.shape, (1,))
-        self.assertAlmostEqual(noquant_features[0], 0.75)
-
-        quant_config = QuantConfig()
-        quant_config.obs.include_remaining_time = True
-        quant_config.obs.include_quant_context = True
-        quant_env = self._auxiliary_obs_stub(
-            QuantEnvironment,
-            quant_config,
-            quantized=True,
-        )
-        quant_features = quant_env._extract_auxiliary_obs_features()
-        np.testing.assert_allclose(quant_features[:1], noquant_features)
-        self.assertEqual(quant_features.shape, (3,))
-        self.assertAlmostEqual(quant_features[1], 0.25)
-        self.assertAlmostEqual(quant_features[2], 0.0625)
+    def test_auxiliary_observations_exclude_clock_and_quant_context(self) -> None:
+        for environment_type, config, quantized in (
+            (NoQuantEnvironment, NoQuantConfig(), False),
+            (QuantEnvironment, QuantConfig(), True),
+        ):
+            config.obs.include_remaining_time = True
+            if quantized:
+                config.obs.include_quant_context = True
+            env = self._auxiliary_obs_stub(
+                environment_type, config, quantized=quantized,
+            )
+            bit_choices = config.uav.quant_bits if quantized else (None,)
+            for step in (0, 50, config.training.episode_max_steps):
+                for bits in bit_choices:
+                    with self.subTest(
+                        variant=environment_type.__module__, step=step, bits=bits,
+                    ):
+                        env.current_step = step
+                        if quantized:
+                            env.current_quant_bits = bits
+                        self.assertEqual(env._extract_auxiliary_obs_features().shape, (0,))
 
     def test_queue_observation_and_penalty_share_remaining_bit_ratio(self) -> None:
         for environment_type, config in (
@@ -1058,76 +1047,90 @@ class OptimizationContractTest(unittest.TestCase):
     def test_quant_energy_mask_repeats_noquant_band_mask_over_quant_bits(self) -> None:
         noquant_config = NoQuantConfig()
         quant_config = QuantConfig()
-        noquant_config.training.episode_max_steps = 2
-        quant_config.training.episode_max_steps = 2
         noquant_env = self._energy_stub(
-            NoQuantEnvironment, noquant_config, quantized=False
+            NoQuantEnvironment, noquant_config, quantized=False,
         )
         quant_env = self._energy_stub(QuantEnvironment, quant_config, quantized=True)
 
-        min_units = min(
-            noquant_config.uav.sensing_units_for_ratio(ratio)
+        step_costs = [
+            (
+                noquant_config.uav.hover_power
+                + noquant_config.uav.sensing_power_for_units(
+                    noquant_config.uav.sensing_units_for_ratio(ratio)
+                )
+            ) * noquant_config.uav.step_duration
             for ratio in noquant_config.uav.bandwidth_ratios
-        )
-        min_step_energy = (
-            noquant_config.uav.hover_power
-            + noquant_config.uav.sensing_power_for_units(min_units)
-        ) * noquant_config.uav.step_duration
-        noquant_env.uav_energy = min_step_energy * 2.0 + 1.0
-        quant_env.uav_energy = noquant_env.uav_energy
+        ]
+        min_cost, max_cost = min(step_costs), max(step_costs)
+        # Exercise both a partially affordable mask and an all-affordable mask.
+        # Reusing the environments also checks that cached geometry does not
+        # freeze the energy-dependent part of the mask.
+        for energy, all_affordable in (
+            ((min_cost + max_cost) / 2.0, False),
+            (max_cost, True),
+        ):
+            with self.subTest(energy=energy):
+                noquant_env.uav_energy = energy
+                quant_env.uav_energy = energy
+                noquant_mask = noquant_env._build_uav_action_mask()
+                quant_mask = quant_env._build_uav_action_mask().reshape(
+                    quant_env.num_bw_choices, quant_env.num_quant_choices,
+                )
+                np.testing.assert_array_equal(
+                    quant_mask,
+                    np.repeat(noquant_mask[:, None], quant_env.num_quant_choices, axis=1),
+                )
+                self.assertTrue(bool(noquant_mask[int(np.argmin(step_costs))]))
+                self.assertEqual(
+                    bool(noquant_mask[int(np.argmax(step_costs))]), all_affordable,
+                )
+                if all_affordable:
+                    self.assertTrue(bool(np.all(noquant_mask)))
 
-        noquant_mask = noquant_env._build_uav_action_mask()
-        quant_mask = quant_env._build_uav_action_mask().reshape(
-            quant_env.num_bw_choices, quant_env.num_quant_choices
-        )
-
-        np.testing.assert_array_equal(quant_mask[:, 0], noquant_mask)
-        np.testing.assert_array_equal(
-            quant_mask,
-            np.repeat(noquant_mask[:, None], quant_env.num_quant_choices, axis=1),
-        )
-        self.assertTrue(bool(noquant_mask[0]))
-        self.assertFalse(bool(noquant_mask[-1]))
-
-    def test_energy_mask_exactly_preserves_minimum_future_reserve(self) -> None:
+    def test_energy_mask_checks_current_cost_without_future_reserve(self) -> None:
         for environment_type, config, quantized in (
             (NoQuantEnvironment, NoQuantConfig(), False),
             (QuantEnvironment, QuantConfig(), True),
         ):
-            config.training.episode_max_steps = 4
-            env = self._energy_stub(
-                environment_type,
-                config,
-                quantized=quantized,
-            )
-            min_power = min(
-                config.uav.sensing_power_for_units(
-                    config.uav.sensing_units_for_ratio(ratio)
-                )
+            env = self._energy_stub(environment_type, config, quantized=quantized)
+            step_costs = [
+                (
+                    config.uav.hover_power
+                    + config.uav.sensing_power_for_units(
+                        config.uav.sensing_units_for_ratio(ratio)
+                    )
+                ) * config.uav.step_duration
                 for ratio in config.uav.bandwidth_ratios
-            )
-            future_reserve = 3.0 * (
-                config.uav.hover_power + min_power
-            ) * config.uav.step_duration
-            selected_ratio = config.uav.bandwidth_ratios[1]
-            selected_power = config.uav.sensing_power_for_units(
-                config.uav.sensing_units_for_ratio(selected_ratio)
-            )
-            selected_step_energy = (
-                config.uav.hover_power + selected_power
-            ) * config.uav.step_duration
+            ]
+            selected_cost = step_costs[1]
+            self.assertGreater(selected_cost, min(step_costs))
+            for horizon in (1, 4, 200):
+                config.training.episode_max_steps = horizon
+                for step in sorted({0, horizon - 1}):
+                    env.current_step = step
+                    for energy, feasible in (
+                        (selected_cost + 1e-6, True),
+                        (selected_cost, True),
+                        (selected_cost - 1e-6, False),
+                    ):
+                        with self.subTest(
+                            variant=environment_type.__module__,
+                            horizon=horizon, step=step, energy=energy,
+                        ):
+                            env.uav_energy = energy
+                            mask = env._build_uav_action_mask()
+                            if quantized:
+                                mask = mask.reshape(env.num_bw_choices, env.num_quant_choices)
+                                np.testing.assert_array_equal(
+                                    mask[1], np.full(env.num_quant_choices, feasible),
+                                )
+                            else:
+                                self.assertEqual(bool(mask[1]), feasible)
 
-            env.uav_energy = future_reserve + selected_step_energy
-            mask = env._build_uav_action_mask()
-            if quantized:
-                mask = mask.reshape(env.num_bw_choices, env.num_quant_choices)[:, 0]
-            self.assertTrue(bool(mask[1]))
-
-            env.uav_energy -= 1e-6
-            mask = env._build_uav_action_mask()
-            if quantized:
-                mask = mask.reshape(env.num_bw_choices, env.num_quant_choices)[:, 0]
-            self.assertFalse(bool(mask[1]))
+            # Positive energy below every action cost must still be rejected.
+            env.uav_energy = min(step_costs) - 1e-6
+            with self.assertRaisesRegex(RuntimeError, "no feasible action"):
+                env._build_uav_action_mask()
 
     def test_run_analysis_labels_smoke_and_keeps_low_completion_diagnostic(self) -> None:
         metrics = {
